@@ -22,6 +22,8 @@ class ProjectScript : public scr::ProjectScript {
     void onUIRender() override;
 
   private:
+    void loadMap(std::string name);
+    void resetMap();
 };
 
 ATTA_REGISTER_PROJECT_SCRIPT(ProjectScript)
