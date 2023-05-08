@@ -14,6 +14,9 @@ class RobotScript : public scr::Script {
     void update(cmp::Entity entity, float dt) override;
 
   private:
+    void updateParticleWeight(RobotComponent::Particle& particle);
+    void moveParticle(RobotComponent::Particle& particle);
+
     cmp::Entity _entity;
     float _dt;
 

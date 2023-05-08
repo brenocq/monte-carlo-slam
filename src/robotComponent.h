@@ -11,8 +11,9 @@ struct RobotComponent final : public cmp::Component {
     struct Particle {
         atta::vec2 pos;
         float ori;
+        float weight;
     };
-    static constexpr uint32_t numParticles = 100;
+    static constexpr uint32_t numParticles = 1000;
     std::array<Particle, numParticles> particles; // Monte Carlo particles
 
     atta::vec2 pos; ///< Estimated position
