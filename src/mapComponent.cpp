@@ -5,19 +5,19 @@
 //--------------------------------------------------
 #include "mapComponent.h"
 
-template <>
-cmp::ComponentDescription& cmp::TypedComponentRegistry<MapComponent>::getDescription() {
-    static cmp::ComponentDescription desc = {
-        "Map",
-        {
-            {AttributeType::CUSTOM, offsetof(MapComponent, grid), "grid"},
-        },
-        // Max instances
-        1024,
-    };
-
-    return desc;
-}
+// template <>
+// cmp::ComponentDescription& cmp::TypedComponentRegistry<MapComponent>::getDescription() {
+//     static cmp::ComponentDescription desc = {
+//         "Map",
+//         {
+//             {AttributeType::CUSTOM, offsetof(MapComponent, grid), "grid"},
+//         },
+//         // Max instances
+//         1024,
+//     };
+//
+//     return desc;
+// }
 
 bool MapComponent::getCell(int x, int y) {
     if (x >= width || y >= height || x < 0 || y < 0)

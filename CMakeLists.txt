@@ -7,9 +7,9 @@ atta_add_target(robot_component "src/robotComponent.cpp")
 atta_add_target(map_component "src/mapComponent.cpp")
 
 # Scripts
-atta_add_target(robot_script "src/robotScript.cpp")
-target_link_libraries(robot_script PRIVATE robot_component map_component)
-
-# Project script
-atta_add_target(project_script "src/projectScript.cpp")
-target_link_libraries(project_script PRIVATE robot_component map_component)
+atta_add_target(controller "src/controller.cpp")
+target_link_libraries(controller PRIVATE robot_component map_component)
+atta_add_target(world "src/world.cpp")
+target_link_libraries(world PRIVATE robot_component map_component)
+atta_add_target(system "src/system.cpp")
+target_link_libraries(system PRIVATE robot_component map_component)

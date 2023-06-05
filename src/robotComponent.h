@@ -7,7 +7,7 @@
 #define ROBOT_COMPONENT_H
 #include <atta/component/interface.h>
 
-struct RobotComponent final : public cmp::Component {
+struct RobotComponent final : public atta::component::Component {
     struct Particle {
         atta::vec2 pos;
         float ori;
@@ -19,8 +19,10 @@ struct RobotComponent final : public cmp::Component {
     atta::vec2 pos; ///< Estimated position
     float ori;      ///< Estimated orientation
 };
+
 ATTA_REGISTER_COMPONENT(RobotComponent);
-template <>
-cmp::ComponentDescription& cmp::TypedComponentRegistry<RobotComponent>::getDescription();
+
+// template <>
+// cmp::ComponentDescription& cmp::TypedComponentRegistry<RobotComponent>::getDescription();
 
 #endif // ROBOT_COMPONENT_H

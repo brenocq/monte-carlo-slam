@@ -1,29 +1,28 @@
 //--------------------------------------------------
 // Monte Carlo SLAM
-// robotScript.h
+// controller.h
 // Date: 2023-04-30
 //--------------------------------------------------
-#ifndef ROBOT_SCRIPT_H
-#define ROBOT_SCRIPT_H
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
 #include "robotComponent.h"
-#include <atta/component/components/components.h>
-#include <atta/script/script.h>
+#include <atta/script/registry/controllerRegistry.h>
+#include <atta/script/scripts/controller.h>
 
-class RobotScript : public scr::Script {
+class Controller : public atta::script::Controller {
   public:
-    void update(cmp::Entity entity, float dt) override;
+    void update() override;
 
   private:
     void updateParticleWeight(RobotComponent::Particle& particle);
     void moveParticle(RobotComponent::Particle& particle);
 
-    cmp::Entity _entity;
-    float _dt;
-
     RobotComponent* _robot;
     std::array<float, 8> _irs;
 };
 
-ATTA_REGISTER_SCRIPT(RobotScript)
+#ifndef __NVCC__
+ATTA_REGISTER_CONTROLLER(Controller)
+#endif
 
-#endif // ROBOT_SCRIPT_H
+#endif // CONTROLLER_H

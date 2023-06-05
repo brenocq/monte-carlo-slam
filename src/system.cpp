@@ -1,9 +1,9 @@
 //--------------------------------------------------
 // Monte Carlo SLAM
-// projectScript.cpp
+// project.cpp
 // Date: 2023-04-30
 //--------------------------------------------------
-#include "projectScript.h"
+#include "system.h"
 #include "imgui.h"
 #include "mapComponent.h"
 #include "robotComponent.h"
@@ -18,27 +18,16 @@ const cmp::Entity walls(1);
 const cmp::Entity robot(7);
 const cmp::Entity map(17);
 
-void ProjectScript::onLoad() {}
+void System::onLoad() {}
 
-void ProjectScript::onUnload() { resetMap(); }
+void System::onUnload() { resetMap(); }
 
-void ProjectScript::onStart() {
-    // Initialize particles
-    RobotComponent* r = robot.get<RobotComponent>();
-    for (RobotComponent::Particle& p : r->particles) {
-        p.pos = atta::vec2(rand() / float(RAND_MAX) * 4.0f, rand() / float(RAND_MAX) * 4.0f) + 0.5f;
-        p.ori = rand() / float(RAND_MAX) * M_PI * 2;
-    }
-}
-
-void ProjectScript::onStop() {}
-
-void ProjectScript::onAttaLoop() {
+void System::onAttaLoop() {
     // Show particles
     RobotComponent* r = robot.get<RobotComponent>();
     gfx::Drawer::clear("particles");
     for (RobotComponent::Particle particle : r->particles) {
-        float angle = (M_PI * 2 / 8) + M_PI * 0.5f + particle.ori;
+        float angle = particle.ori;
         gfx::Drawer::Line line{};
         line.p0 = atta::vec3(particle.pos, 0.1f);
         line.p1 = line.p0 + 0.05f * atta::vec3(cos(angle), sin(angle), 0.0f);
@@ -47,9 +36,9 @@ void ProjectScript::onAttaLoop() {
     }
 }
 
-void ProjectScript::onUIRender() {
+void System::onUIRender() {
     ImGui::SetNextWindowSize(ImVec2(310, 300), ImGuiCond_Once);
-    ImGui::Begin("Project");
+    ImGui::Begin("System");
     {
         static std::vector<std::string> maps; // Available maps
         static int selected = 0;              // Selected map
@@ -139,7 +128,7 @@ std::vector<Box> parseBoxes(MapComponent::Grid bin, uint32_t w, uint32_t h) {
     return boxes;
 }
 
-void ProjectScript::loadMap(std::string name) {
+void System::loadMap(std::string name) {
     resetMap();
 
     // Get image info
@@ -180,10 +169,10 @@ void ProjectScript::loadMap(std::string name) {
         walls.get<cmp::Relationship>()->addChild(walls, wall);
     }
 
-    LOG_SUCCESS("ProjectScript", "Map [w]$0[] loaded successfully", name);
+    LOG_SUCCESS("System", "Map [w]$0[] loaded successfully", name);
 }
 
-void ProjectScript::resetMap() {
+void System::resetMap() {
     for (cmp::Entity child : walls.getChildren())
-        cmp::deleteEntity(child);
+        cmp::destroyEntity(child);
 }
