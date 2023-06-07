@@ -14,8 +14,11 @@ class Controller : public atta::script::Controller {
     void update() override;
 
   private:
-    void updateParticleWeight(RobotComponent::Particle& particle);
-    void moveParticle(RobotComponent::Particle& particle);
+    atta::vec2 calcControl();
+    void move(atta::vec2 control);
+
+    void particlesUpdate();
+    void particlesPredict(atta::vec2 control);
 
     RobotComponent* _robot;
     std::array<float, 8> _irs;
