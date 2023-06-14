@@ -83,14 +83,10 @@ void Controller::particlesPredict(atta::vec2 control) {
     const float speed = 0.03535;
     for (RobotComponent::Particle& particle : _robot->particles) {
         float dt = atta::processor::getDt();
-
         // TODO incorporate control
-        particle.ori += RANDOM(0.5f);
-
-        particle.pos.x += cos(particle.ori) * speed * dt;
-        particle.pos.y += sin(particle.ori) * speed * dt;
-        particle.pos.x += RANDOM(0.05f);
-        particle.pos.y += RANDOM(0.05f);
+        particle.ori += atta::random::normal(0.0f, 0.03f);
+        particle.pos.x += cos(particle.ori) * speed * dt + atta::random::normal(0.0f, 0.002f);
+        particle.pos.y += sin(particle.ori) * speed * dt + atta::random::normal(0.0f, 0.002f);
     }
 }
 
@@ -103,7 +99,7 @@ void Controller::particlesUpdate() {
             const float irRange = entity.getChild(0).getChild(i).get<cmp::InfraredSensor>()->upperLimit;
 
             // Cast ray
-            float angle = -i * (M_PI * 2 / 8) + M_PI * 0.5f + particle.ori;
+            float angle = -i * (M_PI * 2 / 8) + particle.ori;
             atta::vec3 begin = particle.pos;
             atta::vec3 end = atta::vec3(particle.pos, 0.0f) + irRange * atta::vec3(cos(angle), sin(angle), 0.0f);
             std::vector<phy::RayCastHit> hits = phy::rayCast(begin, end);

@@ -21,7 +21,7 @@ struct MapComponent final : public atta::component::Component {
 
 ATTA_REGISTER_COMPONENT(MapComponent);
 
-//template <>
-//cmp::ComponentDescription& cmp::TypedComponentRegistry<MapComponent>::getDescription();
+template <>
+cmp::ComponentDescription& cmp::TypedRegistry<MapComponent>::getDescription();
 
 #endif // MAP_COMPONENT_H

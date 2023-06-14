@@ -29,8 +29,10 @@ void System::onAttaLoop() {
     for (RobotComponent::Particle particle : r->particles) {
         float angle = particle.ori;
         gfx::Drawer::Line line{};
-        line.p0 = atta::vec3(particle.pos, 0.1f);
-        line.p1 = line.p0 + 0.05f * atta::vec3(cos(angle), sin(angle), 0.0f);
+        atta::vec3 pos = atta::vec3(particle.pos, 0.1f);
+        atta::vec3 front = atta::vec3(cos(angle), sin(angle), 0.0f) * 0.025;
+        line.p0 = pos - front;
+        line.p1 = pos + front;
         line.c0 = line.c1 = atta::vec4(0.0f, 0.0f, 1.0f, 1.0f);
         gfx::Drawer::add(line, "particles");
     }

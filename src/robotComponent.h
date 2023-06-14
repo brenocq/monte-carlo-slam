@@ -22,7 +22,7 @@ struct RobotComponent final : public atta::component::Component {
 
 ATTA_REGISTER_COMPONENT(RobotComponent);
 
-// template <>
-// cmp::ComponentDescription& cmp::TypedComponentRegistry<RobotComponent>::getDescription();
+template <>
+cmp::ComponentDescription& cmp::TypedRegistry<RobotComponent>::getDescription();
 
 #endif // ROBOT_COMPONENT_H

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(monte-carlo-slam LANGUAGES CXX)
-find_package(atta 0.4.0.0 REQUIRED)
+find_package(atta 0.4.1 REQUIRED EXACT)
 
 # Components
 atta_add_target(robot_component "src/robotComponent.cpp")
