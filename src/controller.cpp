@@ -185,43 +185,58 @@ void Controller::updateAStar() {
     atta::vec2 start = _robot->pos;
     atta::vec2 end = atta::vec2(goal.get<cmp::Transform>()->position);
 
+    // Gerenerate A*
     if (_robot->path.empty() ||                                              // If empty
-        (_robot->path.back() - end).length() > 2 * MapComponent::cellSize || // End too far
-        (_robot->path.front() - start).length() > 2 * MapComponent::cellSize // Start too far
+        (_robot->path.back() - end).length() > 3 * MapComponent::cellSize || // End too far
+        (_robot->path.front() - start).length() > 3 * MapComponent::cellSize // Start too far
     ) {
         _robot->path = findPathAStar(start, end, map.get<MapComponent>()->collisionGrid);
     }
+
+    // Remove point when too close
+    if (!_robot->path.empty() && (_robot->path.front() - start).length() < MapComponent::cellSize)
+        _robot->path.pop();
 }
 
 atta::vec2 Controller::calcControl() {
-    atta::vec2 dir = atta::vec2(1.0f, 0.0f);
-
-    const float maxDist = 1.0f;
-    for (int i = 0; i < 8; i++) {
-        float ir = _irs[i];
-        float angle = M_PI / 4 * i;
-        if (ir < maxDist)
-            dir -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
+    atta::vec2 dir;
+    if (!_robot->path.empty()) {
+        dir = _robot->path.front() - _robot->pos;
+        dir.normalize();
+        // Global direction to local direction
+        float angle = -_robot->ori;
+        float c = std::cos(angle);
+        float s = std::sin(angle);
+        float newX = dir.x * c - dir.y * s;
+        float newY = dir.x * s + dir.y * c;
+        dir = atta::vec2(newX, newY);
+    } else {
+        dir = atta::vec2(1.0f, 0.0f);
     }
+
+    // Reactive obstacle avoidance
+    // const float maxDist = 1.0f;
+    // for (int i = 0; i < 8; i++) {
+    //    float ir = _irs[i];
+    //    float angle = M_PI / 4 * i;
+    //    if (ir < maxDist)
+    //        dir -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
+    //}
 
     return dir;
 }
 
-void Controller::move(atta::vec2 control) {
+void Controller::processControl(atta::vec2 control, float* linVel, float* angVel) {
     constexpr float wheelD = 0.06f; // Wheel distance
     constexpr float wheelR = 0.01f; // Wheel radius
     constexpr float maxPwr = 5.0f;  // Motor maximum power (max 0.5m/s)
 
-    auto r = entity.get<cmp::RigidBody2D>();
-
     // If break motors
     if (control.x == 0.0f && control.y == 0.0f) {
-        r->setLinearVelocity(atta::vec2(0.0f));
-        r->setAngularVelocity(0.0f);
-        return;
+        *linVel = 0.0f;
+        *angVel = 0.0f;
     }
 
-    // Calculate motor velocities
     control.normalize();
     float dirAngle = atan2(control.y, control.x);                                 // Direction angle
     atta::vec2 pwr(cos(dirAngle) - sin(dirAngle), cos(dirAngle) + sin(dirAngle)); // Power
@@ -229,8 +244,15 @@ void Controller::move(atta::vec2 control) {
     pwr *= maxPwr;
 
     // Calculate linear/angular velocities (differential drive robot)
-    float linVel = wheelR / 2.0f * (pwr.x + pwr.y);
-    float angVel = wheelR / wheelD * (pwr.x - pwr.y);
+    *linVel = wheelR / 2.0f * (pwr.x + pwr.y);
+    *angVel = wheelR / wheelD * (pwr.x - pwr.y);
+}
+
+void Controller::move(atta::vec2 control) {
+    auto r = entity.get<cmp::RigidBody2D>();
+
+    float linVel, angVel;
+    processControl(control, &linVel, &angVel);
 
     // Apply velocities
     float angle = entity.get<cmp::Transform>()->orientation.get2DAngle();
@@ -238,16 +260,15 @@ void Controller::move(atta::vec2 control) {
     r->setAngularVelocity(angVel);
 }
 
-#define RANDOM(x) ((rand() / float(RAND_MAX) - 0.5f) * x)
-
 void Controller::particlesPredict(atta::vec2 control) {
-    const float speed = 0.03535;
     for (RobotComponent::Particle& particle : _robot->particles) {
+        float linVel, angVel;
+        processControl(control, &linVel, &angVel);
         float dt = atta::processor::getDt();
-        // TODO incorporate control
-        particle.ori += atta::random::normal(0.0f, 0.03f);
-        particle.pos.x += cos(particle.ori) * speed * dt + atta::random::normal(0.0f, 0.002f);
-        particle.pos.y += sin(particle.ori) * speed * dt + atta::random::normal(0.0f, 0.002f);
+
+        particle.ori += angVel * dt + atta::random::normal(0.0f, 0.03f);
+        particle.pos.x += cos(particle.ori) * linVel * dt + atta::random::normal(0.0f, 0.002f);
+        particle.pos.y += sin(particle.ori) * linVel * dt + atta::random::normal(0.0f, 0.002f);
     }
 }
 
