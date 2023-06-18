@@ -6,6 +6,7 @@
 #ifndef ROBOT_COMPONENT_H
 #define ROBOT_COMPONENT_H
 #include <atta/component/interface.h>
+#include <queue>
 
 struct RobotComponent final : public atta::component::Component {
     struct Particle {
@@ -18,6 +19,8 @@ struct RobotComponent final : public atta::component::Component {
 
     atta::vec2 pos; ///< Estimated position
     float ori;      ///< Estimated orientation
+
+    std::queue<atta::vec2> path; ///< Path from estimated position to goal
 };
 
 ATTA_REGISTER_COMPONENT(RobotComponent);

@@ -11,12 +11,10 @@ struct MapComponent final : public atta::component::Component {
     static constexpr uint32_t width = 50;
     static constexpr uint32_t height = 50;
     static constexpr uint32_t size = width * height;
+    static constexpr float cellSize = 0.10f; // Each cell is 10cm by 10cm
     using Grid = std::array<bool, size>;
-    Grid grid; ///< Occupancy grid
-
-    bool getCell(int x, int y);
-    bool getCell(atta::vec2i pos);
-    float calcDistance(atta::vec2 pos, float angle);
+    Grid grid;          ///< Occupancy grid
+    Grid collisionGrid; ///< Collision grid. If false, robot can be in any position inside the cell
 };
 
 ATTA_REGISTER_COMPONENT(MapComponent);

@@ -18,7 +18,7 @@ const cmp::Entity walls(1);
 const cmp::Entity robot(7);
 const cmp::Entity map(17);
 
-void System::onLoad() {}
+void System::onLoad() { robot.get<RobotComponent>()->path = {}; }
 
 void System::onUnload() { resetMap(); }
 
@@ -36,6 +36,47 @@ void System::onAttaLoop() {
         line.c0 = line.c1 = atta::vec4(0.0f, 0.0f, 1.0f, 1.0f);
         gfx::Drawer::add(line, "particles");
     }
+
+    // Show robot estimated pos/ori
+    gfx::Drawer::clear("robot");
+    {
+        float angle = r->ori;
+        gfx::Drawer::Line line{};
+        atta::vec3 pos = atta::vec3(r->pos, 0.11f);
+        atta::vec3 front = atta::vec3(cos(angle), sin(angle), 0.0f) * 0.025;
+        line.p0 = pos - front;
+        line.p1 = pos + front;
+        line.c0 = line.c1 = atta::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+        gfx::Drawer::add(line, "robot");
+    }
+
+    // Show robot desired path
+    gfx::Drawer::clear("path");
+    {
+        gfx::Drawer::Line line{};
+        line.c0 = line.c1 = atta::vec4(1.0f, 0.0f, 1.0f, 1.0f);
+
+        // Draw path
+        std::queue<atta::vec2> path = r->path;
+        if (!path.empty()) {
+            atta::vec2 prevPoint = path.front();
+            path.pop();
+
+            while (!path.empty()) {
+                atta::vec2 currPoint = path.front();
+                path.pop();
+
+                atta::vec3 prevPos = atta::vec3(prevPoint, 0.09f);
+                atta::vec3 currPos = atta::vec3(currPoint, 0.09f);
+
+                line.p0 = prevPos;
+                line.p1 = currPos;
+                gfx::Drawer::add(line, "path");
+
+                prevPoint = currPoint;
+            }
+        }
+    }
 }
 
 void System::onUIRender() {
@@ -43,7 +84,7 @@ void System::onUIRender() {
     ImGui::Begin("System");
     {
         static std::vector<std::string> maps; // Available maps
-        static int selected = 0;              // Selected map
+        static int selected = 1;              // Selected map
         bool firstTime = false;
 
         // Populate maps
@@ -150,8 +191,8 @@ void System::loadMap(std::string name) {
     for (const Box& box : boxes) {
         cmp::Entity wall = cmp::createEntity();
 
-        atta::vec2 pos = atta::vec2(box.pos.x, box.pos.y) / 10.0f;
-        atta::vec2 size = atta::vec2(box.size.x, box.size.y) / 10.0f;
+        atta::vec2 pos = atta::vec2(box.pos.x, box.pos.y) * MapComponent::cellSize;
+        atta::vec2 size = atta::vec2(box.size.x, box.size.y) * MapComponent::cellSize;
         pos += size / 2;
 
         cmp::Transform* t = wall.add<cmp::Transform>();
@@ -171,10 +212,34 @@ void System::loadMap(std::string name) {
         walls.get<cmp::Relationship>()->addChild(walls, wall);
     }
 
+    // Generate collision grid
+    generateCollisionGrid();
+
     LOG_SUCCESS("System", "Map [w]$0[] loaded successfully", name);
 }
 
 void System::resetMap() {
     for (cmp::Entity child : walls.getChildren())
         cmp::destroyEntity(child);
+}
+
+void System::generateCollisionGrid() {
+    MapComponent* mapComponent = map.get<MapComponent>();
+    MapComponent::Grid& g = mapComponent->grid;
+    MapComponent::Grid& c = mapComponent->collisionGrid;
+
+    for (int y = 0; y < MapComponent::height; y++) {
+        for (int x = 0; x < MapComponent::width; x++) {
+            bool isColliding = false;
+            if (x <= 1 || y <= 1 || x >= MapComponent::width - 2 || y >= MapComponent::height - 2) {
+                isColliding = true;
+            } else {
+                for (int i = -2; i < 2; i++)
+                    for (int j = -2; j < 2; j++)
+                        if (g[(y + j) * MapComponent::height + (x + i)])
+                            isColliding = true;
+            }
+            c[y * MapComponent::height + x] = isColliding;
+        }
+    }
 }

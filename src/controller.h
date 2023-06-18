@@ -14,6 +14,7 @@ class Controller : public atta::script::Controller {
     void update() override;
 
   private:
+    void updateAStar();
     atta::vec2 calcControl();
     void move(atta::vec2 control);
 

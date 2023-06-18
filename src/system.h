@@ -18,6 +18,7 @@ class System : public atta::script::System {
   private:
     void loadMap(std::string name);
     void resetMap();
+    void generateCollisionGrid();
 };
 
 #ifndef __NVCC__

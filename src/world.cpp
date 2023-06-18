@@ -20,6 +20,7 @@ void World::onStart() {
 void World::onStop() {
     // Delete particles
     RobotComponent* r = robot.get<RobotComponent>();
+    r->path = {};
     for (RobotComponent::Particle& p : r->particles)
         p = {};
 }
