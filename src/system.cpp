@@ -5,6 +5,7 @@
 //--------------------------------------------------
 #include "system.h"
 #include "imgui.h"
+#include "implot.h"
 #include "mapComponent.h"
 #include "robotComponent.h"
 #include <atta/component/components/components.h>
@@ -79,6 +80,15 @@ void System::onAttaLoop() {
     }
 }
 
+void plotState(std::string name, atta::vec2 pos, float angle) {
+    atta::vec2 front = atta::vec2(cos(angle), sin(angle)) * 0.025;
+    atta::vec2 p0 = pos - front;
+    atta::vec2 p1 = pos + front;
+    std::vector<float> x = {p0.x, p1.x};
+    std::vector<float> y = {p0.y, p1.y};
+    ImPlot::PlotLine(name.c_str(), x.data(), y.data(), x.size());
+}
+
 void System::onUIRender() {
     ImGui::SetNextWindowSize(ImVec2(310, 300), ImGuiCond_Once);
     ImGui::Begin("System");
@@ -115,6 +125,29 @@ void System::onUIRender() {
         // Preview
         atta::StringId sid = "maps/" + maps[selected] + ".png";
         ImGui::Image(gfx::getImGuiImage(sid), ImVec2(50, 50));
+
+        // Robot grid preview
+        int w = RobotComponent::width;
+        int h = RobotComponent::height;
+        float s = RobotComponent::cellSize;
+        std::vector<float> grid(w * h);
+        RobotComponent* r = robot.get<RobotComponent>();
+        RobotComponent::Grid rGrid = r->grid;
+        for (int i = 0; i < w * h; i++)
+            grid[i] = rGrid[i] ? 1.0f : 0.0f;
+        if (ImPlot::BeginPlot("Robot view", nullptr, nullptr, ImVec2(600, 600))) {
+            // Plot grid
+            ImPlot::PlotHeatmap("Occupancy", grid.data(), h, w, 0, 0, nullptr, ImPlotPoint(0, 0), ImPlotPoint(w * s, h * s));
+
+            // Plot robot
+            plotState("Robot", r->pos, r->ori);
+
+            // Plot particles
+            for (RobotComponent::Particle particle : r->particles)
+                plotState("Particles", particle.pos, particle.ori);
+
+            ImPlot::EndPlot();
+        }
     }
     ImGui::End();
 }

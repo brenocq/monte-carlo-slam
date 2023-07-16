@@ -23,20 +23,33 @@ void Controller::update() {
     for (int i = 0; i < 8; i++)
         _irs[i] = infrareds.getChild(i).get<cmp::InfraredSensor>()->measurement;
 
+    // Update grid
+    updateGrid();
+
     // Update particles and estimate current state
-    particlesUpdate();
+    // particlesUpdate();
 
     // Generate path given current state and goal
-    updateAStar();
+    // updateAStar();
 
     // Calculate control given next path goal
-    atta::vec2 control = calcControl();
+    // atta::vec2 control = calcControl();
 
     // Move robot
-    move(control);
+    // move(control);
 
     // Predict new particles given control
-    particlesPredict(control);
+    // particlesPredict(control);
+}
+
+void Controller::updateGrid() {
+    int w = RobotComponent::width;
+    int h = RobotComponent::height;
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            _robot->grid[x + y * w] = x % 2;
+        }
+    }
 }
 
 struct Node {

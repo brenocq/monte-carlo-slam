@@ -14,11 +14,16 @@ class Controller : public atta::script::Controller {
     void update() override;
 
   private:
+    // Map
+    void updateGrid();
+
+    // A*
     void updateAStar();
     atta::vec2 calcControl();
     void processControl(atta::vec2 control, float* linVel, float* angVel);
     void move(atta::vec2 control);
 
+    // Monte Carlo
     void particlesUpdate();
     void particlesPredict(atta::vec2 control);
 
