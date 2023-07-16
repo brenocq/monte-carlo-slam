@@ -23,62 +23,7 @@ void System::onLoad() { robot.get<RobotComponent>()->path = {}; }
 
 void System::onUnload() { resetMap(); }
 
-void System::onAttaLoop() {
-    // Show particles
-    // RobotComponent* r = robot.get<RobotComponent>();
-    // gfx::Drawer::clear("particles");
-    // for (RobotComponent::Particle particle : r->particles) {
-    //    float angle = particle.ori;
-    //    gfx::Drawer::Line line{};
-    //    atta::vec3 pos = atta::vec3(particle.pos, 0.1f);
-    //    atta::vec3 front = atta::vec3(cos(angle), sin(angle), 0.0f) * 0.025;
-    //    line.p0 = pos - front;
-    //    line.p1 = pos + front;
-    //    line.c0 = line.c1 = atta::vec4(0.0f, 0.0f, 1.0f, 1.0f);
-    //    gfx::Drawer::add(line, "particles");
-    //}
-
-    //// Show robot estimated pos/ori
-    // gfx::Drawer::clear("robot");
-    //{
-    //     float angle = r->ori;
-    //     gfx::Drawer::Line line{};
-    //     atta::vec3 pos = atta::vec3(r->pos, 0.11f);
-    //     atta::vec3 front = atta::vec3(cos(angle), sin(angle), 0.0f) * 0.025;
-    //     line.p0 = pos - front;
-    //     line.p1 = pos + front;
-    //     line.c0 = line.c1 = atta::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-    //     gfx::Drawer::add(line, "robot");
-    // }
-
-    //// Show robot desired path
-    // gfx::Drawer::clear("path");
-    //{
-    //     gfx::Drawer::Line line{};
-    //     line.c0 = line.c1 = atta::vec4(1.0f, 0.0f, 1.0f, 1.0f);
-
-    //    // Draw path
-    //    std::queue<atta::vec2> path = r->path;
-    //    if (!path.empty()) {
-    //        atta::vec2 prevPoint = path.front();
-    //        path.pop();
-
-    //        while (!path.empty()) {
-    //            atta::vec2 currPoint = path.front();
-    //            path.pop();
-
-    //            atta::vec3 prevPos = atta::vec3(prevPoint, 0.09f);
-    //            atta::vec3 currPos = atta::vec3(currPoint, 0.09f);
-
-    //            line.p0 = prevPos;
-    //            line.p1 = currPos;
-    //            gfx::Drawer::add(line, "path");
-
-    //            prevPoint = currPoint;
-    //        }
-    //    }
-    //}
-}
+void System::onAttaLoop() {}
 
 void plotState(std::string name, atta::vec2 pos, float angle) {
     atta::vec2 front = atta::vec2(cos(angle), sin(angle)) * 0.025;
@@ -143,10 +88,14 @@ void System::onUIRender() {
             else if (rGrid[i] == RobotComponent::WALL)
                 grid[i] = 1.0f;
         }
-        if (ImPlot::BeginPlot("Robot view", nullptr, nullptr, ImVec2(600, 600))) {
+
+        ImGui::SliderFloat("X", &r->goalPos.x, 0.0f, w * s);
+        ImGui::SliderFloat("Y", &r->goalPos.y, 0.0f, h * s);
+
+        if (ImPlot::BeginPlot("Robot grid view", nullptr, nullptr, ImVec2(600, 600))) {
             // Plot grid
             ImPlot::PushColormap(ImPlotColormap_Greys);
-            ImPlot::PlotHeatmap("Occupancy", grid.data(), h, w, 0, 0, nullptr, ImPlotPoint(0, 0), ImPlotPoint(w * s, h * s));
+            ImPlot::PlotHeatmap("Occupancy", grid.data(), h, w, 0, 0, nullptr, ImPlotPoint(0, h * s), ImPlotPoint(w * s, 0));
             ImPlot::PopColormap();
 
             // Plot robot
@@ -155,6 +104,18 @@ void System::onUIRender() {
             // Plot particles
             for (RobotComponent::Particle particle : r->particles)
                 plotState("Particles", particle.pos, particle.ori);
+
+            // Plot path
+            std::vector<float> x;
+            std::vector<float> y;
+            std::queue<atta::vec2> path = r->path;
+            while (!path.empty()) {
+                atta::vec2 p = path.front();
+                path.pop();
+                x.push_back(p.x + s * 0.5f);
+                y.push_back(p.y + s * 0.5f);
+            }
+            ImPlot::PlotLine("Path", x.data(), y.data(), x.size());
 
             ImPlot::EndPlot();
         }

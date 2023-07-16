@@ -28,11 +28,10 @@ struct RobotComponent final : public atta::component::Component {
 
     //---------- A* ----------//
     std::queue<atta::vec2> path; ///< Path from estimated position to goal
+    atta::vec2 goalPos;          ///< Goal A* position
 
     //---------- Map ----------//
-    enum GridState : uint32_t {
-        UNKNOWN = 0, FREE, COLLISION, WALL
-    };
+    enum GridState : uint32_t { UNKNOWN = 0, FREE, COLLISION, WALL };
     static constexpr uint32_t width = 100;
     static constexpr uint32_t height = 100;
     static constexpr uint32_t size = width * height;

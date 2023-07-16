@@ -4,14 +4,10 @@
 // Date: 2023-04-30
 //--------------------------------------------------
 #include "controller.h"
-#include "mapComponent.h"
 #include <atta/component/components/infraredSensor.h>
 #include <atta/component/components/rigidBody2D.h>
 #include <atta/component/components/transform.h>
 #include <atta/processor/interface.h>
-
-const cmp::Entity map(17);
-const cmp::Entity goal(150);
 
 void Controller::update() {
     PROFILE();
@@ -29,6 +25,9 @@ void Controller::update() {
 
             // Calculate collision
             calculateCollision();
+
+            // Generate path given current state and goal
+            updateAStar();
 
             // Reactive obstacle avoidance
             atta::vec2 control = atta::vec2(1.0f, 0.0f);
@@ -171,7 +170,10 @@ std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& 
     auto isWithinMapBounds = [](const atta::vec2i& pos) { return pos.x >= 0 && pos.x < width && pos.y >= 0 && pos.y < height; };
 
     // Create a helper function to check if a position is blocked (occupied) in the collision grid
-    auto isBlocked = [&grid](const atta::vec2i& pos) { return grid[pos.y * width + pos.x]; };
+    auto isBlocked = [&grid](const atta::vec2i& pos) {
+        RobotComponent::GridState g = grid[pos.y * width + pos.x];
+        return g == RobotComponent::WALL || g == RobotComponent::COLLISION;
+    };
 
     // Perform the A* algorithm
     while (!openSet.empty()) {
@@ -227,7 +229,11 @@ std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& 
             atta::vec2(-1, 0), // Left
             atta::vec2(1, 0),  // Right
             atta::vec2(0, -1), // Down
-            atta::vec2(0, 1)   // Up
+            atta::vec2(0, 1),  // Up
+            // atta::vec2(1, 1),   // Up-Right
+            // atta::vec2(-1, 1),  // Up-Left
+            // atta::vec2(1, -1),  // Down-Right
+            // atta::vec2(-1, -1), // Down-Left
         };
 
         for (const atta::vec2i& offset : neighbors) {
@@ -286,14 +292,14 @@ std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& 
 
 void Controller::updateAStar() {
     atta::vec2 start = _robot->pos;
-    atta::vec2 end = atta::vec2(goal.get<cmp::Transform>()->position);
+    atta::vec2 end = _robot->goalPos;
 
     // Gerenerate A*
     if (_robot->path.empty() ||                                                // If empty
         (_robot->path.back() - end).length() > 3 * RobotComponent::cellSize || // End too far
         (_robot->path.front() - start).length() > 3 * RobotComponent::cellSize // Start too far
     ) {
-        _robot->path = findPathAStar(start, end, map.get<RobotComponent>()->grid); // TODO use collision grid
+        _robot->path = findPathAStar(start, end, _robot->grid); // TODO use collision grid
     }
 
     // Remove point when too close

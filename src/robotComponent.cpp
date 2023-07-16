@@ -15,6 +15,7 @@ cmp::ComponentDescription& cmp::TypedRegistry<RobotComponent>::getDescription() 
             {AttributeType::FLOAT32, offsetof(RobotComponent, ori), "ori"},
             {AttributeType::VECTOR_FLOAT32, offsetof(RobotComponent, particles), "particles"},
             {AttributeType::CUSTOM, offsetof(RobotComponent, path), "path"},
+            {AttributeType::VECTOR_FLOAT32, offsetof(RobotComponent, goalPos), "goalPos"},
             {AttributeType::CUSTOM, offsetof(RobotComponent, grid), "grid"},
         },
         // Max instances
