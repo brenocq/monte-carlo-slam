@@ -16,10 +16,10 @@ class Controller : public atta::script::Controller {
   private:
     // Map
     void updateGrid();
+    void calculateCollision();
 
     // A*
     void updateAStar();
-    atta::vec2 calcControl();
     void processControl(atta::vec2 control, float* linVel, float* angVel);
     void move(atta::vec2 control);
 

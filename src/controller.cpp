@@ -8,7 +8,6 @@
 #include <atta/component/components/infraredSensor.h>
 #include <atta/component/components/rigidBody2D.h>
 #include <atta/component/components/transform.h>
-#include <atta/physics/interface.h>
 #include <atta/processor/interface.h>
 
 const cmp::Entity map(17);
@@ -23,31 +22,122 @@ void Controller::update() {
     for (int i = 0; i < 8; i++)
         _irs[i] = infrareds.getChild(i).get<cmp::InfraredSensor>()->measurement;
 
-    // Update grid
-    updateGrid();
+    switch (_robot->state) {
+        case RobotComponent::MAPPING: {
+            // Update grid
+            updateGrid();
 
-    // Update particles and estimate current state
-    // particlesUpdate();
+            // Calculate collision
+            calculateCollision();
 
-    // Generate path given current state and goal
-    // updateAStar();
+            // Reactive obstacle avoidance
+            atta::vec2 control = atta::vec2(1.0f, 0.0f);
+            const float maxDist = 1.0f;
+            for (int i = 0; i < 8; i++) {
+                float ir = _irs[i];
+                float angle = M_PI / 4 * i;
+                if (ir < maxDist)
+                    control -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
+            }
 
-    // Calculate control given next path goal
-    // atta::vec2 control = calcControl();
+            // Move robot
+            move(control);
 
-    // Move robot
-    // move(control);
+            break;
+        }
+        case RobotComponent::LOCALIZATION: {
+            // Update particles and estimate current state
+            particlesUpdate();
 
-    // Predict new particles given control
-    // particlesPredict(control);
+            // Generate path given current state and goal
+            updateAStar();
+
+            // Calculate control given next path goal
+            atta::vec2 control;
+            if (!_robot->path.empty()) {
+                control = _robot->path.front() - _robot->pos;
+                control.normalize();
+                // Global direction to local direction
+                float angle = -_robot->ori;
+                float c = std::cos(angle);
+                float s = std::sin(angle);
+                float newX = control.x * c - control.y * s;
+                float newY = control.x * s + control.y * c;
+                control = atta::vec2(newX, newY);
+            } else {
+                control = atta::vec2(1.0f, 0.0f);
+            }
+
+            // Move robot
+            move(control);
+
+            // Predict new particles given control
+            particlesPredict(control);
+            break;
+        }
+    }
 }
 
 void Controller::updateGrid() {
     int w = RobotComponent::width;
     int h = RobotComponent::height;
+
+    for (int i = 0; i < 8; i++) {
+        const float irRange = entity.getChild(0).getChild(i).get<cmp::InfraredSensor>()->upperLimit;
+        // Ignore if nothing was detected
+        if (_irs[i] >= irRange - 0.05)
+            continue;
+
+        float angle = -i * (M_PI * 2 / 8) + _robot->ori;
+        atta::vec2 begin = _robot->pos;
+        atta::vec2 end = _robot->pos + _irs[i] * atta::vec2(cos(angle), sin(angle));
+
+        // Calculate the number of steps and step size based on the cell size
+        const int numSteps = static_cast<int>(irRange / RobotComponent::cellSize);
+        const atta::vec2 stepSize = (end - begin) / static_cast<float>(numSteps);
+
+        float distance = irRange;
+        bool hitObstacle = false;
+
+        // Perform ray casting by iterating through the steps
+        for (int step = 0; step <= numSteps; step++) {
+            // Calculate the current position along the ray
+            atta::vec2 currentPosition = begin + stepSize * static_cast<float>(step);
+
+            // Convert the position to grid indices
+            int gridX = static_cast<int>(currentPosition.x / RobotComponent::cellSize);
+            int gridY = static_cast<int>(currentPosition.y / RobotComponent::cellSize);
+            gridX = (gridX + RobotComponent::width) % RobotComponent::width;
+            gridY = (gridY + RobotComponent::height) % RobotComponent::height;
+
+            // Set free
+            _robot->grid[gridY * RobotComponent::width + gridX] = RobotComponent::FREE;
+        }
+
+        // Set wall
+        int irX = end.x / RobotComponent::cellSize;
+        int irY = end.y / RobotComponent::cellSize;
+        irX = (irX + w) % w;
+        irY = (irY + h) % h;
+        _robot->grid[irX + irY * w] = RobotComponent::WALL;
+    }
+}
+
+void Controller::calculateCollision() {
+    int w = RobotComponent::width;
+    int h = RobotComponent::height;
+    int colSize = 2;
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
-            _robot->grid[x + y * w] = x % 2;
+            if (_robot->grid[y * w + x] == RobotComponent::WALL) {
+                for (int i = -colSize; i < colSize; i++) {
+                    for (int j = -colSize; j < colSize; j++) {
+                        int idx = (y + j) * w + (x + i);
+                        if (_robot->grid[idx] == RobotComponent::FREE)
+                            _robot->grid[idx] = RobotComponent::COLLISION;
+                    }
+                }
+            }
         }
     }
 }
@@ -61,10 +151,10 @@ struct Node {
     Node(const atta::vec2i& pos, float f, float g, Node* par) : position(pos), fScore(f), gScore(g), parent(par) {}
 };
 
-std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& end, const MapComponent::Grid& grid) {
-    const int width = MapComponent::width;
-    const int height = MapComponent::height;
-    const float cellSize = MapComponent::cellSize;
+std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& end, const RobotComponent::Grid& grid) {
+    const int width = RobotComponent::width;
+    const int height = RobotComponent::height;
+    const float cellSize = RobotComponent::cellSize;
     const atta::vec2i starti = start / cellSize;
     const atta::vec2i endi = end / cellSize;
 
@@ -199,44 +289,16 @@ void Controller::updateAStar() {
     atta::vec2 end = atta::vec2(goal.get<cmp::Transform>()->position);
 
     // Gerenerate A*
-    if (_robot->path.empty() ||                                              // If empty
-        (_robot->path.back() - end).length() > 3 * MapComponent::cellSize || // End too far
-        (_robot->path.front() - start).length() > 3 * MapComponent::cellSize // Start too far
+    if (_robot->path.empty() ||                                                // If empty
+        (_robot->path.back() - end).length() > 3 * RobotComponent::cellSize || // End too far
+        (_robot->path.front() - start).length() > 3 * RobotComponent::cellSize // Start too far
     ) {
-        _robot->path = findPathAStar(start, end, map.get<MapComponent>()->collisionGrid);
+        _robot->path = findPathAStar(start, end, map.get<RobotComponent>()->grid); // TODO use collision grid
     }
 
     // Remove point when too close
-    if (!_robot->path.empty() && (_robot->path.front() - start).length() < MapComponent::cellSize)
+    if (!_robot->path.empty() && (_robot->path.front() - start).length() < RobotComponent::cellSize)
         _robot->path.pop();
-}
-
-atta::vec2 Controller::calcControl() {
-    atta::vec2 dir;
-    if (!_robot->path.empty()) {
-        dir = _robot->path.front() - _robot->pos;
-        dir.normalize();
-        // Global direction to local direction
-        float angle = -_robot->ori;
-        float c = std::cos(angle);
-        float s = std::sin(angle);
-        float newX = dir.x * c - dir.y * s;
-        float newY = dir.x * s + dir.y * c;
-        dir = atta::vec2(newX, newY);
-    } else {
-        dir = atta::vec2(1.0f, 0.0f);
-    }
-
-    // Reactive obstacle avoidance
-    // const float maxDist = 1.0f;
-    // for (int i = 0; i < 8; i++) {
-    //    float ir = _irs[i];
-    //    float angle = M_PI / 4 * i;
-    //    if (ir < maxDist)
-    //        dir -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
-    //}
-
-    return dir;
 }
 
 void Controller::processControl(atta::vec2 control, float* linVel, float* angVel) {
@@ -271,6 +333,12 @@ void Controller::move(atta::vec2 control) {
     float angle = entity.get<cmp::Transform>()->orientation.get2DAngle();
     r->setLinearVelocity(atta::vec2(linVel * cos(angle), linVel * sin(angle)));
     r->setAngularVelocity(angVel);
+
+    // TODO ground truth for now
+    float dt = atta::processor::getDt();
+    _robot->ori += angVel * dt;
+    _robot->pos.x += cos(_robot->ori) * linVel * dt;
+    _robot->pos.y += sin(_robot->ori) * linVel * dt;
 }
 
 void Controller::particlesPredict(atta::vec2 control) {
@@ -294,21 +362,44 @@ void Controller::particlesUpdate() {
             const float irRange = entity.getChild(0).getChild(i).get<cmp::InfraredSensor>()->upperLimit;
 
             // Cast ray
-            float angle = -i * (M_PI * 2 / 8) + particle.ori;
-            atta::vec3 begin = particle.pos;
-            atta::vec3 end = atta::vec3(particle.pos, 0.0f) + irRange * atta::vec3(cos(angle), sin(angle), 0.0f);
-            std::vector<phy::RayCastHit> hits = phy::rayCast(begin, end);
+            float angle = i * (M_PI * 2 / 8) + particle.ori;
+            atta::vec2 begin = particle.pos;
+            atta::vec2 end = particle.pos + irRange * atta::vec2(cos(angle), sin(angle));
 
-            // Process hits
+            // Calculate the number of steps and step size based on the cell size
+            const int numSteps = static_cast<int>(irRange / RobotComponent::cellSize);
+            const atta::vec2 stepSize = (end - begin) / static_cast<float>(numSteps);
+
             float distance = irRange;
-            for (phy::RayCastHit hit : hits) {
-                if (hit.entity == entity)
-                    continue;
-                if (hit.distance < distance)
-                    distance = hit.distance;
+            bool hitObstacle = false;
+
+            // Perform ray casting by iterating through the steps
+            for (int step = 0; step <= numSteps; step++) {
+                // Calculate the current position along the ray
+                atta::vec2 currentPosition = begin + stepSize * static_cast<float>(step);
+
+                // Convert the position to grid indices
+                int gridX = static_cast<int>(currentPosition.x / RobotComponent::cellSize);
+                int gridY = static_cast<int>(currentPosition.y / RobotComponent::cellSize);
+                gridX = (gridX + RobotComponent::width) % RobotComponent::width;
+                gridY = (gridY + RobotComponent::height) % RobotComponent::height;
+
+                // Check if the grid cell is occupied
+                if (_robot->grid[gridY * RobotComponent::width + gridX]) {
+                    // The ray has hit an obstacle, update the distance and flag
+                    distance = step * RobotComponent::cellSize;
+                    hitObstacle = true;
+                    break;
+                }
             }
 
-            particle.weight += std::abs(distance - _irs[i]);
+            // Process hits
+            if (hitObstacle) {
+                particle.weight += std::abs(distance - _irs[i]);
+            } else {
+                // If no obstacle was hit, set the weight to 0 (particle is unlikely to be in a valid position)
+                particle.weight = 0.0f;
+            }
         }
         // Normalize weight between 0 and 1
         particle.weight = 1 / (1 + particle.weight);
@@ -321,8 +412,8 @@ void Controller::particlesUpdate() {
         if (particle.weight > bestParticle.weight)
             bestParticle = particle;
     }
-    _robot->pos = bestParticle.pos;
-    _robot->ori = bestParticle.ori;
+    //_robot->pos = bestParticle.pos;
+    //_robot->ori = bestParticle.ori;
 
     // Normalize particles
     for (RobotComponent::Particle& particle : _robot->particles)
