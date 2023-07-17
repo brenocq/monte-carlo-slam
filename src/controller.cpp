@@ -20,61 +20,66 @@ void Controller::update() {
 
     switch (_robot->state) {
         case RobotComponent::MAPPING: {
+            // Simulate GPS
+            cmp::Transform* t = entity.get<cmp::Transform>();
+            _robot->pos = atta::vec2(t->position) + atta::vec2(atta::random::normal(0.0f, 0.01f), atta::random::normal(0.0f, 0.01f));
+            _robot->ori = t->orientation.get2DAngle() + atta::random::normal(0.0f, 0.01f);
+            // for (RobotComponent::Particle& particle : _robot->particles) {
+            //     particle.pos = _robot->pos;
+            //     particle.ori = _robot->ori;
+            // }
+
             // Update grid
             updateGrid();
 
             // Calculate collision
             calculateCollision();
 
-            // Generate path given current state and goal
-            updateAStar();
-
-            // Reactive obstacle avoidance
-            atta::vec2 control = atta::vec2(1.0f, 0.0f);
-            const float maxDist = 1.0f;
-            for (int i = 0; i < 8; i++) {
-                float ir = _irs[i];
-                float angle = M_PI / 4 * i;
-                if (ir < maxDist)
-                    control -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
-            }
-
-            // Move robot
-            move(control);
-
             break;
         }
         case RobotComponent::LOCALIZATION: {
             // Update particles and estimate current state
-            particlesUpdate();
-
-            // Generate path given current state and goal
-            updateAStar();
-
-            // Calculate control given next path goal
-            atta::vec2 control;
-            if (!_robot->path.empty()) {
-                control = _robot->path.front() - _robot->pos;
-                control.normalize();
-                // Global direction to local direction
-                float angle = -_robot->ori;
-                float c = std::cos(angle);
-                float s = std::sin(angle);
-                float newX = control.x * c - control.y * s;
-                float newY = control.x * s + control.y * c;
-                control = atta::vec2(newX, newY);
-            } else {
-                control = atta::vec2(1.0f, 0.0f);
-            }
-
-            // Move robot
-            move(control);
-
-            // Predict new particles given control
-            particlesPredict(control);
+            // particlesUpdate();
             break;
         }
     }
+
+    // Generate path given current state and goal
+    updateAStar();
+
+    // Calculate control given next path goal
+    atta::vec2 control;
+    if (!_robot->path.empty()) {
+        LOG_DEBUG("Controller", "A*");
+        control = _robot->path.front() - _robot->pos;
+        control.normalize();
+        // Global direction to local direction
+        float angle = -_robot->ori;
+        float c = std::cos(angle);
+        float s = std::sin(angle);
+        float newX = control.x * c - control.y * s;
+        float newY = control.x * s + control.y * c;
+        control = atta::vec2(newX, newY);
+    } else {
+        // Reactive
+        control = atta::vec2(1.0f, 0.0f);
+        const float maxDist = 1.0f;
+        for (int i = 0; i < 8; i++) {
+            float ir = _irs[i];
+            float angle = M_PI / 4 * i;
+            if (ir < maxDist)
+                control -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
+        }
+        LOG_DEBUG("Controller", "Reactive");
+    }
+
+    // Move robot
+    move(control);
+
+    // if (_robot->state == RobotComponent::LOCALIZATION) {
+    //     // Predict new particles given control
+    //     particlesPredict(control);
+    // }
 }
 
 void Controller::updateGrid() {
@@ -125,7 +130,7 @@ void Controller::updateGrid() {
 void Controller::calculateCollision() {
     int w = RobotComponent::width;
     int h = RobotComponent::height;
-    int colSize = 2;
+    int colSize = 3;
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             if (_robot->grid[y * w + x] == RobotComponent::WALL) {
@@ -157,12 +162,6 @@ std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& 
     const atta::vec2i starti = start / cellSize;
     const atta::vec2i endi = end / cellSize;
 
-    // Initialize the open and closed sets
-    std::vector<Node*> openSet;
-    std::vector<Node*> closedSet;
-    Node* startNode = new Node(starti, 0.0f, 0.0f, nullptr);
-    openSet.push_back(startNode);
-
     // Create a helper function to calculate the heuristic (estimated) distance between two positions
     auto heuristic = [](const atta::vec2i& pos1, const atta::vec2i& pos2) { return (pos2 - pos1).length(); };
 
@@ -174,6 +173,16 @@ std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& 
         RobotComponent::GridState g = grid[pos.y * width + pos.x];
         return g == RobotComponent::WALL || g == RobotComponent::COLLISION;
     };
+
+    // Check good start & end position
+    if (!isWithinMapBounds(starti) || isBlocked(starti) || !isWithinMapBounds(endi) || isBlocked(endi))
+        return {};
+
+    // Initialize the open and closed sets
+    std::vector<Node*> openSet;
+    std::vector<Node*> closedSet;
+    Node* startNode = new Node(starti, 0.0f, 0.0f, nullptr);
+    openSet.push_back(startNode);
 
     // Perform the A* algorithm
     while (!openSet.empty()) {
@@ -291,20 +300,27 @@ std::queue<atta::vec2> findPathAStar(const atta::vec2& start, const atta::vec2& 
 }
 
 void Controller::updateAStar() {
+    static int counter = 0;
     atta::vec2 start = _robot->pos;
     atta::vec2 end = _robot->goalPos;
+    atta::vec2i starti = start / RobotComponent::cellSize;
+    starti.x = (starti.x + RobotComponent::width) % RobotComponent::width;
+    starti.y = (starti.y + RobotComponent::height) % RobotComponent::height;
+    RobotComponent::GridState g = _robot->grid[starti.y * RobotComponent::width + starti.x];
 
     // Gerenerate A*
-    if (_robot->path.empty() ||                                                // If empty
-        (_robot->path.back() - end).length() > 3 * RobotComponent::cellSize || // End too far
-        (_robot->path.front() - start).length() > 3 * RobotComponent::cellSize // Start too far
-    ) {
+    if (_robot->path.empty() ||                                                   // If empty
+        (_robot->path.back() - end).length() > 3 * RobotComponent::cellSize ||    // End too far
+        (_robot->path.front() - start).length() > 3 * RobotComponent::cellSize || // Start too far
+        (g == RobotComponent::WALL || g == RobotComponent::COLLISION) && counter >= 100) {
         _robot->path = findPathAStar(start, end, _robot->grid); // TODO use collision grid
+        counter = 0;
     }
 
     // Remove point when too close
     if (!_robot->path.empty() && (_robot->path.front() - start).length() < RobotComponent::cellSize)
         _robot->path.pop();
+    counter++;
 }
 
 void Controller::processControl(atta::vec2 control, float* linVel, float* angVel) {
@@ -341,10 +357,10 @@ void Controller::move(atta::vec2 control) {
     r->setAngularVelocity(angVel);
 
     // TODO ground truth for now
-    float dt = atta::processor::getDt();
-    _robot->ori += angVel * dt;
-    _robot->pos.x += cos(_robot->ori) * linVel * dt;
-    _robot->pos.y += sin(_robot->ori) * linVel * dt;
+    // float dt = atta::processor::getDt();
+    // _robot->ori += angVel * dt;
+    // _robot->pos.x += cos(_robot->ori) * linVel * dt;
+    // _robot->pos.y += sin(_robot->ori) * linVel * dt;
 }
 
 void Controller::particlesPredict(atta::vec2 control) {
@@ -368,7 +384,7 @@ void Controller::particlesUpdate() {
             const float irRange = entity.getChild(0).getChild(i).get<cmp::InfraredSensor>()->upperLimit;
 
             // Cast ray
-            float angle = i * (M_PI * 2 / 8) + particle.ori;
+            float angle = -i * (M_PI * 2 / 8) + particle.ori;
             atta::vec2 begin = particle.pos;
             atta::vec2 end = particle.pos + irRange * atta::vec2(cos(angle), sin(angle));
 
@@ -418,8 +434,8 @@ void Controller::particlesUpdate() {
         if (particle.weight > bestParticle.weight)
             bestParticle = particle;
     }
-    //_robot->pos = bestParticle.pos;
-    //_robot->ori = bestParticle.ori;
+    _robot->pos = bestParticle.pos;
+    _robot->ori = bestParticle.ori;
 
     // Normalize particles
     for (RobotComponent::Particle& particle : _robot->particles)

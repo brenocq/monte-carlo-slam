@@ -102,20 +102,26 @@ void System::onUIRender() {
             plotState("Robot", r->pos, r->ori);
 
             // Plot particles
-            for (RobotComponent::Particle particle : r->particles)
-                plotState("Particles", particle.pos, particle.ori);
+            // for (RobotComponent::Particle particle : r->particles)
+            //    plotState("Particles", particle.pos, particle.ori);
 
             // Plot path
             std::vector<float> x;
             std::vector<float> y;
-            std::queue<atta::vec2> path = r->path;
-            while (!path.empty()) {
-                atta::vec2 p = path.front();
-                path.pop();
-                x.push_back(p.x + s * 0.5f);
-                y.push_back(p.y + s * 0.5f);
+            if (!r->path.empty()) {
+                std::queue<atta::vec2> path = r->path;
+                while (!path.empty()) {
+                    atta::vec2 p = path.front();
+                    path.pop();
+                    x.push_back(p.x + s * 0.5f);
+                    y.push_back(p.y + s * 0.5f);
+                }
+                ImPlot::PlotLine("Path", x.data(), y.data(), x.size());
             }
-            ImPlot::PlotLine("Path", x.data(), y.data(), x.size());
+
+            // Goal
+            ImVec2 center = ImPlot::PlotToPixels(ImPlotPoint(r->goalPos.x, r->goalPos.y));
+            ImPlot::GetPlotDrawList()->AddCircleFilled(center, 5, IM_COL32(0, 255, 0, 255));
 
             ImPlot::EndPlot();
         }
