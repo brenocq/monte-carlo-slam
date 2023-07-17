@@ -50,7 +50,7 @@ void Controller::update() {
     // Calculate control given next path goal
     atta::vec2 control;
     if (!_robot->path.empty()) {
-        LOG_DEBUG("Controller", "A*");
+        LOG_DEBUG("Controller", "A* control");
         control = _robot->path.front() - _robot->pos;
         control.normalize();
         // Global direction to local direction
@@ -70,7 +70,7 @@ void Controller::update() {
             if (ir < maxDist)
                 control -= (1.0f - ir / maxDist) * atta::vec2(cos(angle), sin(angle));
         }
-        LOG_DEBUG("Controller", "Reactive");
+        LOG_DEBUG("Controller", "Reactive control");
     }
 
     // Move robot

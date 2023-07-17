@@ -4,7 +4,7 @@
     <img src="https://storage.googleapis.com/atta-repos/monte-carlo-slam/monte-carlo-slam.gif" height="400">
 </p>
 
-This repository contains code for a Monte Carlo Simultaneous Localization and Mapping (SLAM) implemented with the Atta simulator. Currently, the mapping functionality is not yet implemented and only the localization functionality is operational.
+This repository contains code for a Monte Carlo Simultaneous Localization and Mapping (SLAM) implemented with the Atta simulator. Currently, mapping is performed using GPS and infrared sensors, and Monte Carlo localization using the created map is partially implemented.
 
 The robot, equipped with 8 IR sensors, operates in a 2D known map and its state is represented by a 2D position and an angle. The map is represented as a 50x50 binary image (black for obstacles, white for free space). The robot starts with particles spread around the map, updating and generating new particles based on their weights. The robot's position and angle are estimated from the particles, following which it moves to a desired position by performing A* on the map. 
 
